@@ -7,13 +7,15 @@ import { TopBar } from './TopBar';
 import { Dock } from './Dock';
 import { AppMenu } from './AppMenu';
 import { Window } from './Window';
-import { Terminal } from '../apps/Terminal';
-import { FileManager } from '../apps/FileManager';
-import { TextEditor } from '../apps/TextEditor';
-import { Calculator } from '../apps/Calculator';
-import { Settings } from '../apps/Settings';
-import { SystemMonitor } from '../apps/SystemMonitor';
-import { CloudDesktop } from '../apps/CloudDesktop';
+import { lazy, ErrorBoundary } from 'solid-js';
+
+const Terminal = lazy(() => import('../apps/Terminal').then(m => ({ default: m.Terminal })));
+const FileManager = lazy(() => import('../apps/FileManager').then(m => ({ default: m.FileManager })));
+const TextEditor = lazy(() => import('../apps/TextEditor').then(m => ({ default: m.TextEditor })));
+const Calculator = lazy(() => import('../apps/Calculator').then(m => ({ default: m.Calculator })));
+const Settings = lazy(() => import('../apps/Settings').then(m => ({ default: m.Settings })));
+const SystemMonitor = lazy(() => import('../apps/SystemMonitor').then(m => ({ default: m.SystemMonitor })));
+const CloudDesktop = lazy(() => import('../apps/CloudDesktop').then(m => ({ default: m.CloudDesktop })));
 
 const appComponents: Record<string, Component<{ windowId: string }>> = {
   Terminal, FileManager, TextEditor, Calculator, Settings, SystemMonitor, CloudDesktop
@@ -67,7 +69,9 @@ export const Desktop: Component = () => {
             ];
             return (
               <Window win={win}>
-                <AppComp windowId={win.id} />
+                <ErrorBoundary fallback={(err) => <div style="padding: 20px; color: red;">App crashed: {err.toString()}</div>}>
+                  <AppComp windowId={win.id} />
+                </ErrorBoundary>
               </Window>
             );
           }}
