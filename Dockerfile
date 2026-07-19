@@ -1,4 +1,4 @@
-FROM lscr.io/linuxserver/novnc:latest
+FROM linuxserver/novnc:latest
 
 # Install Webuntu dependencies and DOOM
 RUN apt-get update && \
