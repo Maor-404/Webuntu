@@ -46,14 +46,13 @@ func handleStartContainer(w http.ResponseWriter, r *http.Request) {
 
 	ctx := context.Background()
 
-	// Use our custom local image or fallback to the base
+	// Use our custom local image
 	imageName := "webuntu-desktop:latest"
 	
-	// Check if our custom image exists locally, if not, use the base for testing
 	_, _, err := dockerClient.ImageInspectWithRaw(ctx, imageName)
 	if err != nil {
-		log.Printf("Custom image %s not found locally, falling back to base image", imageName)
-		imageName = "linuxserver/webtop:ubuntu-xfce"
+		http.Error(w, fmt.Sprintf("Error: Custom image %s not found. Please run 'docker build -t webuntu-desktop .' first.", imageName), http.StatusInternalServerError)
+		return
 	}
 
 	resp, err := dockerClient.ContainerCreate(ctx, &container.Config{

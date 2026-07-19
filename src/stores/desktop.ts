@@ -20,7 +20,14 @@ function createDesktopStore() {
   const [nextZ, setNextZ] = createSignal(100);
   const [showAppMenu, setShowAppMenu] = createSignal(false);
   const [contextMenu, setContextMenu] = createSignal<{ x: number; y: number; items: { label: string; action: () => void }[] } | null>(null);
-  const [booted, setBooted] = createSignal(false);
+  const [booted, setBootedSignal] = createSignal(false);
+
+  function setBooted(val: boolean) {
+    setBootedSignal(val);
+    if (val) {
+      setTimeout(() => openWindow('cloud_desktop'), 100);
+    }
+  }
 
   let windowCounter = 0;
 
