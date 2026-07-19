@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     novnc \
     chocolate-doom \
     freedoom \
+    dbus-x11 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create user
@@ -26,7 +27,7 @@ WORKDIR $HOME
 RUN mkdir -p $HOME/.vnc && \
     echo "webuntu" | vncpasswd -f > $HOME/.vnc/passwd && \
     chmod 600 $HOME/.vnc/passwd && \
-    echo "#!/bin/bash\nstartxfce4 &" > $HOME/.vnc/xstartup && \
+    echo "#!/bin/sh\nunset SESSION_MANAGER\nunset DBUS_SESSION_BUS_ADDRESS\nstartxfce4 &" > $HOME/.vnc/xstartup && \
     chmod +x $HOME/.vnc/xstartup
 
 # Expose port 3000 for websockify

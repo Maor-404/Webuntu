@@ -67,6 +67,17 @@ export const Desktop: Component = () => {
               win.appId === 'settings' ? 'Settings' :
               win.appId === 'monitor' ? 'SystemMonitor' : 'Terminal'
             ];
+            
+            if (win.appId === 'cloud_desktop') {
+              return (
+                <div class="cloud-desktop-fullscreen" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 5;">
+                  <ErrorBoundary fallback={(err) => <div style="padding: 20px; color: red;">App crashed: {err.toString()}</div>}>
+                    <AppComp windowId={win.id} />
+                  </ErrorBoundary>
+                </div>
+              );
+            }
+
             return (
               <Window win={win}>
                 <ErrorBoundary fallback={(err) => <div style="padding: 20px; color: red;">App crashed: {err.toString()}</div>}>
