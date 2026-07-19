@@ -1,4 +1,4 @@
-FROM linuxserver/novnc:latest
+FROM linuxserver/webtop:ubuntu-xfce
 
 # Install Webuntu dependencies and DOOM
 RUN apt-get update && \

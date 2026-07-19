@@ -53,7 +53,7 @@ func handleStartContainer(w http.ResponseWriter, r *http.Request) {
 	_, _, err := dockerClient.ImageInspectWithRaw(ctx, imageName)
 	if err != nil {
 		log.Printf("Custom image %s not found locally, falling back to base image", imageName)
-		imageName = "linuxserver/novnc:latest"
+		imageName = "linuxserver/webtop:ubuntu-xfce"
 	}
 
 	resp, err := dockerClient.ContainerCreate(ctx, &container.Config{
