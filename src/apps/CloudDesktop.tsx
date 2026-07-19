@@ -22,7 +22,7 @@ export const CloudDesktop: Component<CloudDesktopProps> = (props) => {
 
     try {
       rfb = new RFB(containerRef, wsUrl, {
-        credentials: { password: '' } // No password required for default linuxserver/novnc
+        credentials: { password: 'webuntu' }
       });
 
       rfb.scaleViewport = true;
