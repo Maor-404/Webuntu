@@ -2,7 +2,7 @@
 // Webuntu — Cloud Desktop (noVNC Viewer)
 // ============================================================================
 import { onMount, onCleanup, type Component } from 'solid-js';
-import RFB from '@novnc/novnc/core/rfb';
+import RFB from '@novnc/novnc';
 import { cloudStore } from '../stores/cloud';
 
 interface CloudDesktopProps { windowId: string; }
