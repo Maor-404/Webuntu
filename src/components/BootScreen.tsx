@@ -12,7 +12,8 @@ export const BootScreen: Component<BootScreenProps> = (props) => {
   const [progress, setProgress] = createSignal(0);
   const [fadingOut, setFadingOut] = createSignal(false);
   const [status, setStatus] = createSignal('Initializing hardware...');
-  const { isConnecting, error } = cloudStore;
+  const [isConnecting] = cloudStore.isConnecting;
+  const [error] = cloudStore.error;
 
   onMount(() => {
     // Simulate initial hardware boot

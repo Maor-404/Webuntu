@@ -5,6 +5,7 @@ import { onMount, onCleanup, type Component } from 'solid-js';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { Shell } from '../core/shell';
+import { cloudStore } from '../stores/cloud';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalProps { windowId: string; }
