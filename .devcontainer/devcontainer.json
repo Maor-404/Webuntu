@@ -1,0 +1,37 @@
+{
+  "name": "Webuntu Codespace",
+  "image": "mcr.microsoft.com/devcontainers/go:1-1.20-bullseye",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "dockerDashComposeVersion": "v2"
+    }
+  },
+  "forwardPorts": [3000, 8080],
+  "portsAttributes": {
+    "3000": {
+      "label": "Webuntu Frontend",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "Go Orchestrator",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": "npm install && cd backend && go mod tidy",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      },
+      "extensions": [
+        "golang.Go",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}
