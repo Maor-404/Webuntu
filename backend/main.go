@@ -5,20 +5,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
-	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for dev
-	},
-}
-
 var dockerClient *client.Client
+var activeContainerID string
+var targetURL *url.URL
 
 func init() {
 	var err error
@@ -29,109 +27,74 @@ func init() {
 }
 
 func main() {
-	http.HandleFunc("/api/start", handleStartContainer)
-	http.HandleFunc("/ws/proxy", handleMachineWSProxy)
-
-	port := ":8080"
-	fmt.Printf("Webuntu Codespaces Orchestrator running on http://localhost%s\n", port)
-	log.Fatal(http.ListenAndServe(port, nil))
-}
-
-// handleStartContainer spins up a fresh Ubuntu container inside Codespaces via Docker-in-Docker
-func handleStartContainer(w http.ResponseWriter, r *http.Request) {
 	if dockerClient == nil {
-		http.Error(w, "Docker client not initialized.", http.StatusInternalServerError)
-		return
+		log.Fatal("Docker client not initialized. Make sure Docker is running.")
 	}
 
+	// Spin up the container immediately on boot
 	ctx := context.Background()
+	log.Println("Initializing Webuntu Cloud OS...")
 
-	// Use our custom local image
 	imageName := "webuntu-desktop:latest"
-	
 	_, _, err := dockerClient.ImageInspectWithRaw(ctx, imageName)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error: Custom image %s not found. Please run 'docker build -t webuntu-desktop .' first.", imageName), http.StatusInternalServerError)
-		return
+		log.Fatalf("Error: Custom image %s not found. Please run 'docker build -t webuntu-desktop .' first.", imageName)
 	}
 
+	// Create a new container
 	resp, err := dockerClient.ContainerCreate(ctx, &container.Config{
 		Image: imageName,
 		Tty:   true,
 		OpenStdin: true,
+		Env: []string{
+			"PUID=1000",
+			"PGID=1000",
+			"TZ=Etc/UTC",
+		},
 	}, &container.HostConfig{
-		AutoRemove: true, // Container deletes itself when stopped
+		AutoRemove: true,
 	}, nil, nil, "")
 
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create container: %v", err), http.StatusInternalServerError)
-		return
+		log.Fatalf("Failed to create container: %v", err)
 	}
 
 	if err := dockerClient.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to start container: %v", err), http.StatusInternalServerError)
-		return
+		log.Fatalf("Failed to start container: %v", err)
 	}
 	
-	// Get the container's internal IP to proxy noVNC traffic to it
-	inspect, err := dockerClient.ContainerInspect(ctx, resp.ID)
+	activeContainerID = resp.ID
+	log.Printf("Webuntu Cloud VM started successfully (Container ID: %s)", activeContainerID)
+
+	// Get the container's internal IP
+	inspect, err := dockerClient.ContainerInspect(ctx, activeContainerID)
 	internalIP := "localhost"
 	if err == nil && inspect.NetworkSettings != nil {
 		internalIP = inspect.NetworkSettings.IPAddress
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	// Frontend expects private_ip
-	fmt.Fprintf(w, `{"containerId": "%s", "private_ip": "%s"}`, resp.ID, internalIP)
-}
-
-// handleMachineWSProxy routes the user's local WebSocket traffic to the internal Docker container
-func handleMachineWSProxy(w http.ResponseWriter, r *http.Request) {
-	machineIP := r.URL.Query().Get("ip")
-	if machineIP == "" {
-		http.Error(w, "Missing target machine IP", http.StatusBadRequest)
-		return
-	}
-
-	ws, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Printf("Failed to upgrade client to websocket: %v", err)
-		return
-	}
-	defer ws.Close()
-
-	// Connect to the target Docker container's internal IP on the default websockify port
-	targetURL := fmt.Sprintf("ws://%s:3000/websockify", machineIP)
+	// webtop (KasmVNC) runs its web server on port 3000
+	targetURL, _ = url.Parse(fmt.Sprintf("http://%s:3000", internalIP))
 	
-	// Dial the internal machine
-	machineWS, _, err := websocket.DefaultDialer.Dial(targetURL, nil)
+	log.Printf("Proxying traffic to Cloud VM at %s", targetURL.String())
+
+	// Create a reverse proxy to forward all HTTP/WebSocket traffic to the KasmVNC server
+	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+	
+	// Webtop KasmVNC requires some specific headers sometimes, but usually standard proxy works
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// KasmVNC sometimes redirects or sets cookies, the proxy handles this transparently
+		proxy.ServeHTTP(w, r)
+	})
+
+	port := ":8080"
+	fmt.Printf("\n=======================================================\n")
+	fmt.Printf("🚀 WEBUNTU CLOUD DESKTOP is LIVE!\n")
+	fmt.Printf("🌐 Open http://localhost%s in your browser\n", port)
+	fmt.Printf("=======================================================\n")
+	
+	err = http.ListenAndServe(port, nil)
 	if err != nil {
-		log.Printf("Failed to connect to local container %s: %v", machineIP, err)
-		return
-	}
-	defer machineWS.Close()
-
-	// Stream from Machine -> Client
-	go func() {
-		for {
-			messageType, p, err := machineWS.ReadMessage()
-			if err != nil {
-				return
-			}
-			if err := ws.WriteMessage(messageType, p); err != nil {
-				return
-			}
-		}
-	}()
-
-	// Stream from Client -> Machine
-	for {
-		messageType, p, err := ws.ReadMessage()
-		if err != nil {
-			break
-		}
-		if err := machineWS.WriteMessage(messageType, p); err != nil {
-			break
-		}
+		log.Fatal("ListenAndServe: ", err)
 	}
 }
