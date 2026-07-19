@@ -1,14 +1,14 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"os"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
 	"github.com/gorilla/websocket"
 )
 
@@ -18,79 +18,75 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// Fly.io API configuration
-const flyAPIUrl = "https://api.machines.dev/v1/apps"
-var flyAppName = os.Getenv("FLY_APP_NAME") // Needs to be set to your fly app name
-var flyToken = os.Getenv("FLY_API_TOKEN")
+var dockerClient *client.Client
+
+func init() {
+	var err error
+	dockerClient, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		log.Printf("Warning: Failed to initialize Docker client. Error: %v", err)
+	}
+}
 
 func main() {
-	if flyAppName == "" {
-		flyAppName = "webuntu-desktop-nodes" // Default fallback
-	}
-
-	http.HandleFunc("/api/start", handleStartMachine)
+	http.HandleFunc("/api/start", handleStartContainer)
 	http.HandleFunc("/ws/proxy", handleMachineWSProxy)
 
 	port := ":8080"
-	fmt.Printf("Webuntu Cloud Orchestrator running on port %s\n", port)
+	fmt.Printf("Webuntu Codespaces Orchestrator running on http://localhost%s\n", port)
 	log.Fatal(http.ListenAndServe(port, nil))
 }
 
-// handleStartMachine requests Fly.io to boot an ephemeral micro-VM
-func handleStartMachine(w http.ResponseWriter, r *http.Request) {
-	if flyToken == "" {
-		http.Error(w, "Server not configured for cloud deployment (missing FLY_API_TOKEN)", http.StatusInternalServerError)
+// handleStartContainer spins up a fresh Ubuntu container inside Codespaces via Docker-in-Docker
+func handleStartContainer(w http.ResponseWriter, r *http.Request) {
+	if dockerClient == nil {
+		http.Error(w, "Docker client not initialized.", http.StatusInternalServerError)
 		return
 	}
 
-	// Machine creation payload
-	payload := map[string]interface{}{
-		"name":   "", // Auto-generate name
-		"region": "iad", // Ashburn, VA (or closest to user)
-		"config": map[string]interface{}{
-			"image": "registry.fly.io/webuntu-desktop:latest",
-			"guest": map[string]interface{}{
-				"cpu_kind": "shared",
-				"cpus":     1,
-				"memory_mb": 1024,
-			},
-			"auto_destroy": true, // Critical for "No Combustion" - auto delete on exit
-		},
+	ctx := context.Background()
+
+	// Use our custom local image or fallback to the base
+	imageName := "webuntu-desktop:latest"
+	
+	// Check if our custom image exists locally, if not, use the base for testing
+	_, _, err := dockerClient.ImageInspectWithRaw(ctx, imageName)
+	if err != nil {
+		log.Printf("Custom image %s not found locally, falling back to base image", imageName)
+		imageName = "linuxserver/novnc:latest"
 	}
 
-	body, _ := json.Marshal(payload)
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s/machines", flyAPIUrl, flyAppName), bytes.NewBuffer(body))
+	resp, err := dockerClient.ContainerCreate(ctx, &container.Config{
+		Image: imageName,
+		Tty:   true,
+		OpenStdin: true,
+	}, &container.HostConfig{
+		AutoRemove: true, // Container deletes itself when stopped
+	}, nil, nil, "")
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to create container: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if err := dockerClient.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to start container: %v", err), http.StatusInternalServerError)
 		return
 	}
 	
-	req.Header.Set("Authorization", "Bearer "+flyToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to contact cloud API: %v", err), http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(resp.Body)
-		http.Error(w, fmt.Sprintf("Cloud provider rejected request: %s", string(respBody)), resp.StatusCode)
-		return
+	// Get the container's internal IP to proxy noVNC traffic to it
+	inspect, err := dockerClient.ContainerInspect(ctx, resp.ID)
+	internalIP := "localhost"
+	if err == nil && inspect.NetworkSettings != nil {
+		internalIP = inspect.NetworkSettings.IPAddress
 	}
 
-	// Forward the machine ID and internal IP back to the frontend
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-	
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	// Frontend expects private_ip
+	fmt.Fprintf(w, `{"containerId": "%s", "private_ip": "%s"}`, resp.ID, internalIP)
 }
 
-// handleMachineWSProxy routes the user's local WebSocket traffic to the internal cloud VM
+// handleMachineWSProxy routes the user's local WebSocket traffic to the internal Docker container
 func handleMachineWSProxy(w http.ResponseWriter, r *http.Request) {
 	machineIP := r.URL.Query().Get("ip")
 	if machineIP == "" {
@@ -105,13 +101,13 @@ func handleMachineWSProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	// Connect to the target machine via Flycast internal network (e.g. noVNC port 6080)
-	targetURL := fmt.Sprintf("ws://[%s]:6080/websockify", machineIP)
+	// Connect to the target Docker container's internal IP on the default websockify port
+	targetURL := fmt.Sprintf("ws://%s:3000/websockify", machineIP)
 	
 	// Dial the internal machine
 	machineWS, _, err := websocket.DefaultDialer.Dial(targetURL, nil)
 	if err != nil {
-		log.Printf("Failed to connect to micro-VM %s: %v", machineIP, err)
+		log.Printf("Failed to connect to local container %s: %v", machineIP, err)
 		return
 	}
 	defer machineWS.Close()

@@ -17,7 +17,8 @@ export const CloudDesktop: Component<CloudDesktopProps> = (props) => {
 
     // Connect to our Go backend's WebSocket proxy which routes to the Cloud VM
     // Standard websockify port for linuxserver/novnc is typically handled internally
-    const wsUrl = `ws://localhost:8080/ws/proxy?ip=${machineIP()}`;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/proxy?ip=${machineIP()}`;
 
     try {
       rfb = new RFB(containerRef, wsUrl, {

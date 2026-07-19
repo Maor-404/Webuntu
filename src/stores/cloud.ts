@@ -13,7 +13,7 @@ export const cloudStore = {
 
     try {
       // Hit our Go backend running locally on port 8080 (the Fly.io orchestrator)
-      const res = await fetch('http://localhost:8080/api/start');
+      const res = await fetch('/api/start');
       if (!res.ok) {
         throw new Error(`Cloud API failed: ${res.statusText}`);
       }
