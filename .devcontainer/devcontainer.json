@@ -1,13 +1,17 @@
 {
   "name": "Webuntu Codespace",
-  "image": "mcr.microsoft.com/devcontainers/go:1-1.20-bullseye",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
   "features": {
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.20"
+    },
     "ghcr.io/devcontainers/features/node:1": {
       "version": "lts"
     },
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "version": "latest",
-      "dockerDashComposeVersion": "v2"
+      "enableNonRootDocker": "true",
+      "moby": "true"
     }
   },
   "forwardPorts": [3000, 8080],
