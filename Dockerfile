@@ -21,6 +21,8 @@ RUN apt-get update && \
     htop \
     neofetch \
     micro \
+    rclone \
+    fuse3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Starship prompt (blazing-fast Rust shell prompt)

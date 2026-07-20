@@ -79,15 +79,23 @@ echo -e "Type \e[1;36mai\e[0m and press Enter to chat with your local AI assista
 		},
 	}
 
+	// Attempt FUSE device mapping for rclone cloud drives
+	if _, err := os.Stat("/dev/fuse"); err == nil {
+		hostConfig.Resources.Devices = append(hostConfig.Resources.Devices, container.DeviceMapping{
+			PathOnHost:        "/dev/fuse",
+			PathInContainer:   "/dev/fuse",
+			CgroupPermissions: "mrw",
+		})
+		log.Println("FUSE device (/dev/fuse) passed to container for Virtual Cloud Storage")
+	}
+
 	// Attempt hardware acceleration
 	if _, err := os.Stat("/dev/dri"); err == nil {
-		hostConfig.Resources.Devices = []container.DeviceMapping{
-			{
-				PathOnHost:        "/dev/dri",
-				PathInContainer:   "/dev/dri",
-				CgroupPermissions: "mrw",
-			},
-		}
+		hostConfig.Resources.Devices = append(hostConfig.Resources.Devices, container.DeviceMapping{
+			PathOnHost:        "/dev/dri",
+			PathInContainer:   "/dev/dri",
+			CgroupPermissions: "mrw",
+		})
 		log.Println("Hardware acceleration enabled (/dev/dri passed to container)")
 	}
 
