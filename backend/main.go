@@ -47,6 +47,24 @@ func main() {
 	os.MkdirAll(drivePath, 0777)
 	absDrivePath, _ := filepath.Abs(drivePath)
 
+	// Inject custom .bashrc for AI alias and neofetch
+	bashrcPath := filepath.Join(drivePath, ".bashrc")
+	if _, err := os.Stat(bashrcPath); os.IsNotExist(err) {
+		bashrcContent := `
+# Webuntu Ultimate .bashrc
+neofetch
+
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+alias ai='ollama run qwen2:0.5b'
+
+echo -e "\e[1;32mWelcome to Webuntu Cloud OS!\e[0m"
+echo -e "Type \e[1;36mai\e[0m and press Enter to chat with your local AI assistant."
+`
+		os.WriteFile(bashrcPath, []byte(bashrcContent), 0644)
+	}
+
 	hostConfig := &container.HostConfig{
 		AutoRemove:  true,
 		ShmSize:     1024 * 1024 * 1024, // 1GB shared memory for browsers
