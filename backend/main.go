@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -40,6 +41,24 @@ func main() {
 		log.Fatalf("Error: Custom image %s not found. Please run 'docker build -t webuntu-desktop .' first.", imageName)
 	}
 
+	hostConfig := &container.HostConfig{
+		AutoRemove:  true,
+		ShmSize:     1024 * 1024 * 1024, // 1GB shared memory for browsers
+		SecurityOpt: []string{"seccomp=unconfined"},
+	}
+
+	// Attempt hardware acceleration
+	if _, err := os.Stat("/dev/dri"); err == nil {
+		hostConfig.Resources.Devices = []container.DeviceMapping{
+			{
+				PathOnHost:        "/dev/dri",
+				PathInContainer:   "/dev/dri",
+				CgroupPermissions: "mrw",
+			},
+		}
+		log.Println("Hardware acceleration enabled (/dev/dri passed to container)")
+	}
+
 	// Create a new container
 	resp, err := dockerClient.ContainerCreate(ctx, &container.Config{
 		Image: imageName,
@@ -50,9 +69,7 @@ func main() {
 			"PGID=1000",
 			"TZ=Etc/UTC",
 		},
-	}, &container.HostConfig{
-		AutoRemove: true,
-	}, nil, nil, "")
+	}, hostConfig, nil, nil, "")
 
 	if err != nil {
 		log.Fatalf("Failed to create container: %v", err)
