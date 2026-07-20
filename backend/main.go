@@ -95,6 +95,7 @@ echo -e "Type \e[1;36mai\e[0m and press Enter to chat with your local AI assista
 			"PUID=1000",
 			"PGID=1000",
 			"TZ=Etc/UTC",
+			"MAX_RES=1920x1080", // Clamp resolution to prevent extreme lag
 		},
 	}, hostConfig, nil, nil, "")
 
