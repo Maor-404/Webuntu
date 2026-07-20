@@ -62,6 +62,8 @@ alias la='ls -A'
 alias l='ls -CF'
 alias ai='ollama run qwen2:0.5b'
 
+eval "$(starship init bash)"
+
 echo -e "\e[1;32mWelcome to Webuntu Cloud OS!\e[0m"
 echo -e "Type \e[1;36mai\e[0m and press Enter to chat with your local AI assistant."
 `

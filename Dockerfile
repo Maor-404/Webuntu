@@ -20,7 +20,11 @@ RUN apt-get update && \
     git \
     htop \
     neofetch \
+    micro \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Starship prompt (blazing-fast Rust shell prompt)
+RUN curl -sS https://starship.rs/install.sh | sh -s -- -y
 
 # Install ultra-lightweight VSCodium and patch launcher
 RUN wget -qO - https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg \
