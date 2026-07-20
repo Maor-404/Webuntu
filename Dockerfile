@@ -1,5 +1,10 @@
 FROM linuxserver/webtop:ubuntu-xfce
 
+# Route build caches to high-speed volatile RAM disk (/tmp)
+ENV TMPDIR=/tmp \
+    PIP_CACHE_DIR=/tmp/pip \
+    npm_config_cache=/tmp/npm
+
 # Install Webuntu dependencies, DOOM, and massive application suite
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \

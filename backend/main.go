@@ -77,6 +77,10 @@ echo -e "Type \e[1;36mai\e[0m and press Enter to chat with your local AI assista
 		Binds: []string{
 			fmt.Sprintf("%s:/config", absDrivePath),
 		},
+		Tmpfs: map[string]string{
+			"/tmp":       "rw,nosuid,size=2g",
+			"/var/cache": "rw,nosuid,size=1g",
+		},
 	}
 
 	// Attempt FUSE device mapping for rclone cloud drives
