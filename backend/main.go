@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log"
@@ -8,7 +9,9 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -137,8 +140,37 @@ echo -e "Type \e[1;36mai\e[0m and press Enter to chat with your local AI assista
 	fmt.Printf("🌐 Open http://localhost%s in your browser\n", port)
 	fmt.Printf("=======================================================\n")
 	
+	go startCloudflareTunnel()
+
 	err = http.ListenAndServe(port, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
+	}
+}
+
+func startCloudflareTunnel() {
+	if _, err := os.Stat("./cloudflared"); os.IsNotExist(err) {
+		log.Println("Downloading Cloudflare Tunnel binary...")
+		cmd := exec.Command("wget", "-q", "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64", "-O", "cloudflared")
+		cmd.Run()
+		os.Chmod("cloudflared", 0755)
+	}
+
+	log.Println("Requesting global secure URL from Cloudflare...")
+	cmd := exec.Command("./cloudflared", "tunnel", "--url", "http://localhost:8080")
+	
+	stderr, _ := cmd.StderrPipe()
+	cmd.Start()
+
+	scanner := bufio.NewScanner(stderr)
+	urlRegex := regexp.MustCompile(`https://[a-zA-Z0-9-]+\.trycloudflare\.com`)
+	
+	for scanner.Scan() {
+		line := scanner.Text()
+		if match := urlRegex.FindString(line); match != "" {
+			fmt.Printf("\n=======================================================\n")
+			fmt.Printf("🌍 GLOBAL ACCESS URL: %s\n", match)
+			fmt.Printf("=======================================================\n\n")
+		}
 	}
 }
