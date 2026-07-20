@@ -8,6 +8,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"path/filepath"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -41,10 +42,18 @@ func main() {
 		log.Fatalf("Error: Custom image %s not found. Please run 'docker build -t webuntu-desktop .' first.", imageName)
 	}
 
+	// Create persistent drive (Idea 1)
+	drivePath := "./webuntu_drive"
+	os.MkdirAll(drivePath, 0777)
+	absDrivePath, _ := filepath.Abs(drivePath)
+
 	hostConfig := &container.HostConfig{
 		AutoRemove:  true,
 		ShmSize:     1024 * 1024 * 1024, // 1GB shared memory for browsers
 		SecurityOpt: []string{"seccomp=unconfined"},
+		Binds: []string{
+			fmt.Sprintf("%s:/config", absDrivePath),
+		},
 	}
 
 	// Attempt hardware acceleration
